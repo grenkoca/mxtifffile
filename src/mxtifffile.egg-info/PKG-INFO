@@ -17,6 +17,9 @@ License-File: LICENSE
 Requires-Dist: tifffile
 Requires-Dist: numpy
 Requires-Dist: imagecodecs
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
 Dynamic: license-file
 
 # mxtifffile / MxTiffFile
@@ -63,7 +66,7 @@ f = MxTiffFile('example_image.qptiff')
 print(f.format_id)  # e.g. "qptiff", "ome-tiff", or "imagej"
 
 # Display available biomarkers
-print(f.get_biomarkers())
+print(f.get_markers())
 
 # Print summary of all channels
 f.print_channel_summary()
