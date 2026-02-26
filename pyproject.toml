@@ -2,5 +2,33 @@
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "mxtifffile"
+version = "0.0.2"
+description = "A config-driven multiplex TIFF reader supporting QPTIFF, OME-TIFF, and ImageJ formats"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "MIT"}
+authors = [
+    {name = "Caleb Grenko", email = "grenkoca@gmail.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "tifffile",
+    "numpy",
+    "imagecodecs",
+]
+
+[project.urls]
+Homepage = "https://github.com/grenkoca/qptifffile"
+"Bug Tracker" = "https://github.com/grenkoca/qptifffile/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.setuptools.package-data]
-qptifffile = ["formats.json"]
+mxtifffile = ["formats.json"]
