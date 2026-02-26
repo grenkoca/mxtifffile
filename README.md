@@ -1,4 +1,4 @@
-# mxtifffile / MxTiffFile
+# MxTiffFile
 
 A Python package for reading and processing multiplex fluorescence TIFF files — including QPTIFF (PerkinElmer/Akoya Fusion), OME-TIFF, and ImageJ TIFF formats.
 
