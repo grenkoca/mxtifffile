@@ -1,9 +1,9 @@
-# qptifffile / MxTiffFile
+# mxtifffile / MxTiffFile
 
 A Python package for reading and processing multiplex fluorescence TIFF files — including QPTIFF (PerkinElmer/Akoya Fusion), OME-TIFF, and ImageJ TIFF formats.
 
-[![PyPI version](https://badge.fury.io/py/qptifffile.svg)](https://badge.fury.io/py/qptifffile)
-[![PyPI Downloads](https://static.pepy.tech/personalized-badge/qptifffile?period=total&units=INTERNATIONAL_SYSTEM&left_color=GRAY&right_color=BLUE&left_text=downloads)](https://pepy.tech/projects/qptifffile)
+[![PyPI version](https://badge.fury.io/py/mxtifffile.svg)](https://badge.fury.io/py/mxtifffile)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/mxtifffile?period=total&units=INTERNATIONAL_SYSTEM&left_color=GRAY&right_color=BLUE&left_text=downloads)](https://pepy.tech/projects/mxtifffile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
@@ -33,7 +33,7 @@ OME-TIFF takes priority over ImageJ for hybrid files produced by Bio-Formats.
 ## Basic Usage
 
 ```python
-from qptifffile import MxTiffFile
+from mxtifffile import MxTiffFile
 
 # Open any supported multiplex TIFF
 f = MxTiffFile('example_image.qptiff')
@@ -60,11 +60,11 @@ markers = f.read_region(['DAPI', 'CD8', 'PD-L1'])
 
 ```python
 # Before (deprecated)
-from qptifffile import QPTiffFile
+from mxtifffile import QPTiffFile
 f = QPTiffFile('image.qptiff')
 
 # After
-from qptifffile import MxTiffFile
+from mxtifffile import MxTiffFile
 f = MxTiffFile('image.qptiff')
 ```
 
@@ -75,12 +75,12 @@ f = MxTiffFile('image.qptiff')
 For files not matched by any entry in `formats.json`, the reader falls back to a heuristic that searches the file's XML metadata for a configurable anchor marker name. By default this is `"DAPI"`:
 
 ```python
-import qptifffile
+import mxtifffile
 
 # Change the anchor marker used for heuristic detection
-qptifffile.ANCHOR_MARKER = "HOECHST"
+mxtifffile.ANCHOR_MARKER = "HOECHST"
 
-f = qptifffile.MxTiffFile('unknown_format.tiff')
+f = mxtifffile.MxTiffFile('unknown_format.tiff')
 ```
 
 If the heuristic succeeds, a warning is emitted: `MxTiffFile: format not recognized; channel names inferred heuristically`. If both config-based and heuristic detection fail, `MxTiffFormatError` is raised.
@@ -88,7 +88,7 @@ If the heuristic succeeds, a warning is emitted: `MxTiffFile: format not recogni
 ### Handling Unknown Formats
 
 ```python
-from qptifffile import MxTiffFile, MxTiffFormatError
+from mxtifffile import MxTiffFile, MxTiffFormatError
 
 try:
     f = MxTiffFile('proprietary_image.tiff')
@@ -103,7 +103,7 @@ except MxTiffFormatError as e:
 Point the reader at your own `formats.json` to support proprietary or non-standard formats:
 
 ```python
-from qptifffile import MxTiffFile
+from mxtifffile import MxTiffFile
 
 # Per-file custom config
 f = MxTiffFile('proprietary.tiff', formats_config='/path/to/my_formats.json')
@@ -112,7 +112,7 @@ f = MxTiffFile('proprietary.tiff', formats_config='/path/to/my_formats.json')
 You can also pre-cache a custom config for use across multiple files:
 
 ```python
-from qptifffile import load_formats
+from mxtifffile import load_formats
 
 load_formats('/path/to/my_formats.json')
 ```
@@ -149,14 +149,14 @@ Each entry in `formats.json` describes how to detect a format and where to find 
 ### From PyPI
 
 ```bash
-pip install qptifffile
+pip install mxtifffile
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/grenkoca/qptifffile.git
-cd qptifffile
+git clone https://github.com/grenkoca/mxtifffile.git
+cd mxtifffile
 pip install -e .
 ```
 
@@ -205,7 +205,7 @@ wget https://downloads.openmicroscopy.org/images/Vectra-QPTIFF/perkinelmer/PKI_s
 ### Working with Regions of Interest
 
 ```python
-In [1]: from qptifffile import MxTiffFile
+In [1]: from mxtifffile import MxTiffFile
 
 In [2]: f = MxTiffFile('../Phenocycler/Data/slides/Scan1.qptiff')
 
@@ -249,17 +249,17 @@ In [8]: plt.imshow(img, cmap='gray')
 In [9]: plt.show()
 ```
 
-<img src=https://github.com/grenkoca/qptifffile/blob/main/.imgs/image.jpg width="50%">
+<img src=https://github.com/grenkoca/mxtifffile/blob/main/.imgs/image.jpg width="50%">
 
 ## Citation
 
 If you use this software in your research, please cite:
 
 ```
-@software{qptifffile,
+@software{mxtifffile,
   author = {Grenko, Caleb},
-  title = {QPTiffFile: A Python package for working with Vectra/Akoya QPTIFF files},
-  url = {https://github.com/grenkoca/qptifffile},
+  title = {MxTiffFile: A Python package for working with multiplexed image files},
+  url = {https://github.com/grenkoca/mxtifffile},
   year = {2025},
 }
 ```
