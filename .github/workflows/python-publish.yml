@@ -47,9 +47,11 @@ jobs:
 
     # Dedicated environments with protections for publishing are strongly recommended.
     # For more information, see: https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment#deployment-protection-rules
+    # NOTE: The PyPI trusted publishing environment must be configured for mxtifffile on PyPI.org
+    # (one-time manual step: go to https://pypi.org/manage/project/mxtifffile/settings/publishing/)
     environment:
       name: pypi
-      url: https://pypi.org/p/qptifffile
+      url: https://pypi.org/p/mxtifffile
 
     steps:
       - name: Retrieve release distributions

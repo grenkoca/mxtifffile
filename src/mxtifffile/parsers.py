@@ -81,10 +81,7 @@ class FileLevelParser:
             return []
 
         cleaned = _strip_xml_comments(raw)
-        try:
-            root = ET.fromstring(cleaned)
-        except ET.ParseError:
-            return []
+        root = ET.fromstring(cleaned)  # let ET.ParseError propagate
 
         # Build namespace map for XPath if namespace is present
         ns_map: Dict[str, str] = {}

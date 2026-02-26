@@ -1,4 +1,28 @@
-# MxTiffFile
+Metadata-Version: 2.4
+Name: mxtifffile
+Version: 0.0.2
+Summary: A config-driven multiplex TIFF reader supporting QPTIFF, OME-TIFF, and ImageJ formats
+Home-page: https://github.com/grenkoca/qptifffile
+Author: Caleb Grenko
+Author-email: Caleb Grenko <grenkoca@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/grenkoca/qptifffile
+Project-URL: Bug Tracker, https://github.com/grenkoca/qptifffile/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: tifffile
+Requires-Dist: numpy
+Requires-Dist: imagecodecs
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Dynamic: license-file
+
+# mxtifffile / MxTiffFile
 
 A Python package for reading and processing multiplex fluorescence TIFF files — including QPTIFF (PerkinElmer/Akoya Fusion), OME-TIFF, and ImageJ TIFF formats.
 
@@ -61,7 +85,7 @@ markers = f.read_region(['DAPI', 'CD8', 'PD-L1'])
 ```python
 # Before (deprecated)
 from mxtifffile import QPTiffFile
-f = QPTiffFile('image.qptiff') #note: you will use f.get_biomarkers() instead of f.get_markers()
+f = QPTiffFile('image.qptiff')
 
 # After
 from mxtifffile import MxTiffFile
