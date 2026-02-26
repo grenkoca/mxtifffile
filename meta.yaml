@@ -1,13 +1,14 @@
-{% set name = "qptifffile" %}
-{% set version = "0.0.1" %}
+{% set name = "mxtifffile" %}
+{% set version = "0.0.2" %}
 
 package:
   name: {{ name|lower }}
   version: {{ version }}
 
 source:
-  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  sha256: (SHA256 hash of your package)
+  url: https://pypi.io/packages/source/m/mxtifffile/mxtifffile-{{ version }}.tar.gz
+  # Run: curl -s https://pypi.org/pypi/mxtifffile/{{ version }}/json | python -m json.tool | grep sha256
+  sha256: PLACEHOLDER
 
 build:
   number: 0
@@ -26,12 +27,10 @@ requirements:
 
 test:
   imports:
-    - qptiff
+    - mxtifffile
 
 about:
-  home: https://github.com/yourusername/qptiff
+  home: https://github.com/grenkoca/qptifffile
   license: MIT
   license_file: LICENSE
-  summary: A package for working with Quantitative Phase TIFF files
-
-
+  summary: A config-driven multiplex TIFF reader supporting QPTIFF, OME-TIFF, and ImageJ formats
