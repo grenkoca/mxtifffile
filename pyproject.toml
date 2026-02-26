@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mxtifffile"
-version = "0.0.2"
+version = "0.0.1"
 description = "A config-driven multiplex TIFF reader supporting QPTIFF, OME-TIFF, and ImageJ formats"
 readme = "README.md"
 requires-python = ">=3.6"

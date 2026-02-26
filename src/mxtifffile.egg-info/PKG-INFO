@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: mxtifffile
-Version: 0.0.2
+Version: 0.0.1
 Summary: A config-driven multiplex TIFF reader supporting QPTIFF, OME-TIFF, and ImageJ formats
 Home-page: https://github.com/grenkoca/qptifffile
 Author: Caleb Grenko
