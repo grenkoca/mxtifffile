@@ -42,7 +42,7 @@ f = MxTiffFile('example_image.qptiff')
 print(f.format_id)  # e.g. "qptiff", "ome-tiff", or "imagej"
 
 # Display available biomarkers
-print(f.get_biomarkers())
+print(f.get_markers())
 
 # Print summary of all channels
 f.print_channel_summary()
@@ -61,7 +61,7 @@ markers = f.read_region(['DAPI', 'CD8', 'PD-L1'])
 ```python
 # Before (deprecated)
 from mxtifffile import QPTiffFile
-f = QPTiffFile('image.qptiff')
+f = QPTiffFile('image.qptiff') #note: you will use f.get_biomarkers() instead of f.get_markers()
 
 # After
 from mxtifffile import MxTiffFile
