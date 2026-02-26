@@ -71,8 +71,7 @@ def _find_name_element_for_structure(root: ET.Element, anchor_elem: ET.Element) 
 
 def _per_page_heuristic(tif) -> Optional[List[Dict[str, Any]]]:
     """Try to infer channel names from per-page XML descriptions."""
-    import qptifffile as _pkg
-    anchor = _pkg.ANCHOR_MARKER
+    anchor = ANCHOR_MARKER
     pages = tif.series[0].pages
 
     # Check page 0 for the anchor marker
@@ -114,8 +113,7 @@ def _per_page_heuristic(tif) -> Optional[List[Dict[str, Any]]]:
 
 def _file_level_heuristic(tif) -> Optional[List[Dict[str, Any]]]:
     """Try to infer channel names from file-level XML (page 0 description)."""
-    import qptifffile as _pkg
-    anchor = _pkg.ANCHOR_MARKER
+    anchor = ANCHOR_MARKER
     pages = tif.series[0].pages
     if not pages:
         return None
