@@ -7,6 +7,7 @@ from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
+
 class QPTiffFile(TiffFile):
     """
     Extended TiffFile class that automatically extracts biomarker information
@@ -51,8 +52,11 @@ class QPTiffFile(TiffFile):
         Get a thread-local file handle for safe parallel file I/O.
         Each thread gets its own file handle to avoid race conditions.
         """
-        if not hasattr(self._thread_local, 'file_handle') or self._thread_local.file_handle is None:
-            self._thread_local.file_handle = open(self.file_path, 'rb')
+        if (
+            not hasattr(self._thread_local, "file_handle")
+            or self._thread_local.file_handle is None
+        ):
+            self._thread_local.file_handle = open(self.file_path, "rb")
         return self._thread_local.file_handle
 
     def _extract_biomarkers(self) -> None:
@@ -65,85 +69,102 @@ class QPTiffFile(TiffFile):
         self.channel_info = []
 
         # Only process if we have pages to process
-        if not hasattr(self, 'series') or len(self.series) == 0 or len(self.series[0].pages) == 0:
+        if (
+            not hasattr(self, "series")
+            or len(self.series) == 0
+            or len(self.series[0].pages) == 0
+        ):
             return
 
         # Process each page in the first series
         for page_idx, page in enumerate(self.series[0].pages):
             channel_data = {
-                'index': page_idx,
-                'fluorophore': None,
-                'biomarker': None,
-                'display_name': None,
-                'description': None,
-                'exposure': None,
-                'wavelength': None,
-                'raw_xml': None if not hasattr(page, 'description') else page.description
+                "index": page_idx,
+                "fluorophore": None,
+                "biomarker": None,
+                "display_name": None,
+                "description": None,
+                "exposure": None,
+                "wavelength": None,
+                "raw_xml": None
+                if not hasattr(page, "description")
+                else page.description,
             }
 
-            if hasattr(page, 'description') and page.description:
+            if hasattr(page, "description") and page.description:
                 try:
                     # Parse XML from the description
                     root = ET.fromstring(page.description)
 
                     # Extract fluorophore name
-                    name_element = root.find('.//Name')
+                    name_element = root.find(".//Name")
                     if name_element is not None and name_element.text:
-                        channel_data['fluorophore'] = name_element.text
+                        channel_data["fluorophore"] = name_element.text
                         self.fluorophores.append(name_element.text)
                     else:
                         default_name = f"Channel_{page_idx + 1}"
-                        channel_data['fluorophore'] = default_name
+                        channel_data["fluorophore"] = default_name
                         self.fluorophores.append(default_name)
 
                     # Look for various metadata elements
-                    self._extract_metadata_element(root, './/DisplayName', 'display_name', channel_data)
-                    self._extract_metadata_element(root, './/Description', 'description', channel_data)
-                    self._extract_metadata_element(root, './/Exposure', 'exposure', channel_data)
-                    self._extract_metadata_element(root, './/Wavelength', 'wavelength', channel_data)
+                    self._extract_metadata_element(
+                        root, ".//DisplayName", "display_name", channel_data
+                    )
+                    self._extract_metadata_element(
+                        root, ".//Description", "description", channel_data
+                    )
+                    self._extract_metadata_element(
+                        root, ".//Exposure", "exposure", channel_data
+                    )
+                    self._extract_metadata_element(
+                        root, ".//Wavelength", "wavelength", channel_data
+                    )
 
                     # Look for Biomarker element with multiple potential paths
                     biomarker_paths = [
-                        './/Biomarker',
-                        './/BioMarker',
-                        './/BioMarker/Name',
-                        './/Biomarker/Name',
-                        './/StainName',
-                        './/Marker',
-                        './/ProteinMarker'
+                        ".//Biomarker",
+                        ".//BioMarker",
+                        ".//BioMarker/Name",
+                        ".//Biomarker/Name",
+                        ".//StainName",
+                        ".//Marker",
+                        ".//ProteinMarker",
                     ]
 
                     biomarker_found = False
                     for path in biomarker_paths:
-                        if self._extract_metadata_element(root, path, 'biomarker', channel_data):
+                        if self._extract_metadata_element(
+                            root, path, "biomarker", channel_data
+                        ):
                             biomarker_found = True
-                            self.biomarkers.append(channel_data['biomarker'])
+                            self.biomarkers.append(channel_data["biomarker"])
                             break
 
                     if not biomarker_found:
                         # Use fluorophore name as fallback
-                        channel_data['biomarker'] = channel_data['fluorophore']
-                        self.biomarkers.append(channel_data['biomarker'])
+                        channel_data["biomarker"] = channel_data["fluorophore"]
+                        self.biomarkers.append(channel_data["biomarker"])
 
                 except ET.ParseError:
                     # Handle the case where the description is not valid XML
                     default_name = f"Channel_{page_idx + 1}"
-                    channel_data['fluorophore'] = default_name
-                    channel_data['biomarker'] = default_name
+                    channel_data["fluorophore"] = default_name
+                    channel_data["biomarker"] = default_name
                     self.fluorophores.append(default_name)
                     self.biomarkers.append(default_name)
                 except Exception as e:
                     print(f"Error parsing page {page_idx}: {str(e)}")
                     default_name = f"Channel_{page_idx + 1}"
-                    channel_data['fluorophore'] = default_name
-                    channel_data['biomarker'] = default_name
+                    channel_data["fluorophore"] = default_name
+                    channel_data["biomarker"] = default_name
                     self.fluorophores.append(default_name)
                     self.biomarkers.append(default_name)
 
             self.channel_info.append(channel_data)
 
-    def _extract_metadata_element(self, root: ET.Element, xpath: str,
-                                  key: str, channel_data: dict) -> bool:
+    def _extract_metadata_element(
+        self, root: ET.Element, xpath: str, key: str, channel_data: dict
+    ) -> bool:
         """
         Extract metadata element from XML and add to channel_data.
 
@@ -169,7 +190,9 @@ class QPTiffFile(TiffFile):
             return True
         return False
 
-    def _read_page_region_optimized(self, page, y: int, x: int, height: int, width: int) -> np.ndarray:
+    def _read_page_region_optimized(
+        self, page, y: int, x: int, height: int, width: int
+    ) -> np.ndarray:
         """
         Optimized method to read a region from a TIFF page using tile-based reading when available.
 
@@ -188,7 +211,7 @@ class QPTiffFile(TiffFile):
             The requested region
         """
         # Check if page is tiled
-        if hasattr(page, 'is_tiled') and page.is_tiled:
+        if hasattr(page, "is_tiled") and page.is_tiled:
             try:
                 # Use tile-based reading for better performance
                 return self._read_tiled_region(page, y, x, height, width)
@@ -201,9 +224,11 @@ class QPTiffFile(TiffFile):
         # Use lock to prevent race conditions when tifffile reads from disk
         with self._file_io_lock:
             full_page = page.asarray()
-        return full_page[y:y + height, x:x + width].copy()
+        return full_page[y : y + height, x : x + width].copy()
 
-    def _read_tiled_region(self, page, y: int, x: int, height: int, width: int) -> np.ndarray:
+    def _read_tiled_region(
+        self, page, y: int, x: int, height: int, width: int
+    ) -> np.ndarray:
         """
         Read region using tile-based access for tiled TIFF pages.
         This is much more efficient than reading the entire page.
@@ -260,7 +285,9 @@ class QPTiffFile(TiffFile):
                     raise Exception(f"Unsupported compression: {page.compression}")
 
                 # Reshape to tile dimensions
-                tile_data = np.frombuffer(decompressed, dtype=page.dtype).reshape(tile_height, tile_width)
+                tile_data = np.frombuffer(decompressed, dtype=page.dtype).reshape(
+                    tile_height, tile_width
+                )
 
                 # Calculate where this tile intersects with our region
                 tile_start_x = tile_x * tile_width
@@ -279,16 +306,21 @@ class QPTiffFile(TiffFile):
                 out_y1 = out_y0 + (in_tile_y1 - in_tile_y0)
 
                 # Copy tile data to output
-                output[out_y0:out_y1, out_x0:out_x1] = \
-                    tile_data[in_tile_y0:in_tile_y1, in_tile_x0:in_tile_x1]
+                output[out_y0:out_y1, out_x0:out_x1] = tile_data[
+                    in_tile_y0:in_tile_y1, in_tile_x0:in_tile_x1
+                ]
 
         return output
 
-    def _read_striped_region(self, page, y: int, x: int, height: int, width: int) -> np.ndarray:
+    def _read_striped_region(
+        self, page, y: int, x: int, height: int, width: int
+    ) -> np.ndarray:
         """
         Read region using strip-based access for striped TIFF pages.
         """
-        rowsperstrip = page.rowsperstrip if hasattr(page, 'rowsperstrip') else page.shape[0]
+        rowsperstrip = (
+            page.rowsperstrip if hasattr(page, "rowsperstrip") else page.shape[0]
+        )
 
         # Calculate which strips we need
         start_strip = y // rowsperstrip
@@ -309,10 +341,11 @@ class QPTiffFile(TiffFile):
         region_y0 = y - (start_strip * rowsperstrip)
         region_y1 = region_y0 + height
 
-        return full_strips[region_y0:region_y1, x:x + width].copy()
+        return full_strips[region_y0:region_y1, x : x + width].copy()
 
-    def _get_cached_page_region(self, page_key: str, page, y: int, x: int,
-                               height: int, width: int) -> np.ndarray:
+    def _get_cached_page_region(
+        self, page_key: str, page, y: int, x: int, height: int, width: int
+    ) -> np.ndarray:
         """
         Get a page region with caching support.
 
@@ -366,12 +399,14 @@ class QPTiffFile(TiffFile):
         """
         return self.biomarkers
 
-    def read_region(self,
-                    layers: Union[str, Iterable[str], int, Iterable[int], None] = None,
-                    pos: Union[Tuple[int, int], None] = None,
-                    shape: Union[Tuple[int, int], None] = None,
-                    level: int = 0,
-                    parallel: bool = False):
+    def read_region(
+        self,
+        layers: Union[str, Iterable[str], int, Iterable[int], None] = None,
+        pos: Union[Tuple[int, int], None] = None,
+        shape: Union[Tuple[int, int], None] = None,
+        level: int = 0,
+        parallel: bool = False,
+    ):
         """
         Read a region from the QPTIFF file for specified layers.
 
@@ -400,7 +435,9 @@ class QPTiffFile(TiffFile):
             level = int(level)
 
         if level >= len(self.series[0].levels):
-            raise ValueError(f"Series index {level} out of range (max: {len(self.series) - 1})")
+            raise ValueError(
+                f"Series index {level} out of range (max: {len(self.series) - 1})"
+            )
 
         series = self.series[0].levels[level]
 
@@ -423,7 +460,9 @@ class QPTiffFile(TiffFile):
             raise ValueError(f"Position ({x}, {y}) contains negative values")
 
         if x + width > img_width or y + height > img_height:
-            raise ValueError(f"Requested region exceeds image dimensions: {img_width}x{img_height}")
+            raise ValueError(
+                f"Requested region exceeds image dimensions: {img_width}x{img_height}"
+            )
 
         # Determine which layers to read
         layer_indices = []
@@ -439,18 +478,24 @@ class QPTiffFile(TiffFile):
             for layer in layers:
                 if isinstance(layer, int):
                     if layer < 0 or layer >= len(series.pages):
-                        raise ValueError(f"Layer index {layer} out of range (max: {len(series.pages) - 1})")
+                        raise ValueError(
+                            f"Layer index {layer} out of range (max: {len(series.pages) - 1})"
+                        )
                     layer_indices.append(layer)
                 elif isinstance(layer, str):
                     # Try to find biomarker by name
                     if layer in self.biomarkers:
                         # Find all occurrences (in case of duplicates)
-                        indices = [i for i, bm in enumerate(self.biomarkers) if bm == layer]
+                        indices = [
+                            i for i, bm in enumerate(self.biomarkers) if bm == layer
+                        ]
                         layer_indices.extend(indices)
                     else:
                         raise ValueError(f"Biomarker '{layer}' not found in this file")
                 else:
-                    raise TypeError(f"Layer identifier must be string or int, got {type(layer)}")
+                    raise TypeError(
+                        f"Layer identifier must be string or int, got {type(layer)}"
+                    )
 
         # Remove duplicates while preserving order
         layer_indices = list(dict.fromkeys(layer_indices))
@@ -458,10 +503,14 @@ class QPTiffFile(TiffFile):
         # Read the requested regions for each layer
         if parallel and len(layer_indices) > 1:
             # Use parallel reading for multiple layers
-            result_layers = self._read_layers_parallel(series, layer_indices, y, x, height, width, level)
+            result_layers = self._read_layers_parallel(
+                series, layer_indices, y, x, height, width, level
+            )
         else:
             # Sequential reading
-            result_layers = self._read_layers_sequential(series, layer_indices, y, x, height, width, level)
+            result_layers = self._read_layers_sequential(
+                series, layer_indices, y, x, height, width, level
+            )
 
         # Return result based on number of layers
         if len(result_layers) == 1:
@@ -470,8 +519,9 @@ class QPTiffFile(TiffFile):
             # Stack layers along a new axis
             return np.stack(result_layers, axis=2)
 
-    def _read_single_layer(self, series, idx: int, y: int, x: int,
-                          height: int, width: int, level: int) -> np.ndarray:
+    def _read_single_layer(
+        self, series, idx: int, y: int, x: int, height: int, width: int, level: int
+    ) -> np.ndarray:
         """
         Read a single layer region. Used by both parallel and sequential reading.
 
@@ -495,8 +545,16 @@ class QPTiffFile(TiffFile):
         page_key = f"L{level}_P{idx}"
         return self._get_cached_page_region(page_key, page, y, x, height, width)
 
-    def _read_layers_sequential(self, series, layer_indices: List[int],
-                                y: int, x: int, height: int, width: int, level: int) -> List[np.ndarray]:
+    def _read_layers_sequential(
+        self,
+        series,
+        layer_indices: List[int],
+        y: int,
+        x: int,
+        height: int,
+        width: int,
+        level: int,
+    ) -> List[np.ndarray]:
         """
         Read multiple layers sequentially.
         """
@@ -506,17 +564,28 @@ class QPTiffFile(TiffFile):
             result_layers.append(region)
         return result_layers
 
-    def _read_layers_parallel(self, series, layer_indices: List[int],
-                             y: int, x: int, height: int, width: int, level: int) -> List[np.ndarray]:
+    def _read_layers_parallel(
+        self,
+        series,
+        layer_indices: List[int],
+        y: int,
+        x: int,
+        height: int,
+        width: int,
+        level: int,
+    ) -> List[np.ndarray]:
         """
         Read multiple layers in parallel using a thread pool.
         """
+
         def read_layer_wrapper(idx):
             return self._read_single_layer(series, idx, y, x, height, width, level)
 
         with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
             # Submit all read tasks
-            futures = [executor.submit(read_layer_wrapper, idx) for idx in layer_indices]
+            futures = [
+                executor.submit(read_layer_wrapper, idx) for idx in layer_indices
+            ]
 
             # Collect results in order
             result_layers = [future.result() for future in futures]
@@ -556,12 +625,11 @@ class QPTiffFile(TiffFile):
         print("-" * 80)
 
         for i, channel in enumerate(self.channel_info, 1):
-            biomarker = channel.get('biomarker', 'N/A')
-            fluorophore = channel.get('fluorophore', 'N/A')
-            description = channel.get('description', 'N/A')
+            biomarker = channel.get("biomarker", "N/A")
+            fluorophore = channel.get("fluorophore", "N/A")
+            description = channel.get("description", "N/A")
             # Truncate description if too long
             if description and len(description) > 30:
-                description = description[:27] + '...'
+                description = description[:27] + "..."
 
             print(f"{i:<3} {biomarker:<20} {fluorophore:<15} {description:<30}")
-

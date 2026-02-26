@@ -1,3 +1,7 @@
 tifffile
 numpy
 imagecodecs
+
+[dev]
+pytest
+pytest-cov
