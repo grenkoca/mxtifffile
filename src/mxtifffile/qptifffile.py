@@ -355,7 +355,7 @@ class QPTiffFile(TiffFile):
 
         return region
 
-    def get_biomarkers(self) -> List[str]:
+    def get_markers(self) -> List[str]:
         """
         Get the list of biomarkers.
 
