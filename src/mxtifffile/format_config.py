@@ -63,11 +63,11 @@ def load_formats(path: Optional[str] = None) -> List[FormatConfig]:
 
         try:
             from importlib.resources import files  # Python 3.9+
-            data = files("qptifffile").joinpath("formats.json").read_text(encoding="utf-8")
+            data = files("mxtifffile").joinpath("formats.json").read_text(encoding="utf-8")
         except AttributeError:
             # Python 3.8 fallback
             import importlib.resources as pkg_resources
-            data = pkg_resources.read_text("qptifffile", "formats.json")
+            data = pkg_resources.read_text("mxtifffile", "formats.json")
 
         configs = _parse_json(data, source="bundled formats.json")
         _CACHE = configs
@@ -81,6 +81,14 @@ def load_formats(path: Optional[str] = None) -> List[FormatConfig]:
         data = fh.read()
 
     return _parse_json(data, source=path)
+
+
+def _cache_clear() -> None:
+    global _CACHE
+    _CACHE = None
+
+
+load_formats.cache_clear = _cache_clear  # type: ignore[attr-defined]
 
 
 def _parse_json(data: str, source: str) -> List[FormatConfig]:
