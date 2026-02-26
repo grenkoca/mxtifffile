@@ -107,12 +107,12 @@ class MxTiffFile(TiffFile):
                 except Exception:
                     root_tag = "unknown"
 
-                import qptifffile as _pkg
+                from .heuristic import ANCHOR_MARKER as _anchor
                 raise MxTiffFormatError(
                     f"MxTiffFile: cannot detect format for '{self.file_path}'. "
                     f"Page 0 XML root tag: '{root_tag}'. "
-                    f"Add a config entry in formats.json or set qptifffile.ANCHOR_MARKER "
-                    f"(currently '{_pkg.ANCHOR_MARKER}') to a marker present in this file."
+                    f"Add a config entry in formats.json or set mxtifffile.ANCHOR_MARKER "
+                    f"(currently '{_anchor}') to a marker present in this file."
                 )
 
         self.channel_info = channel_data or []
