@@ -1,4 +1,3 @@
-import xml.etree.ElementTree as ET
 from tifffile import TiffFile
 import os
 import numpy as np
@@ -7,24 +6,28 @@ from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
+
 class MxTiffFile(TiffFile):
     """
     Extended TiffFile class that automatically extracts biomarker information
-    from QPTIFF files upon initialization.
+    from multiplex TIFF files (QPTIFF, OME-TIFF, ImageJ) upon initialization.
     """
 
-    def __init__(self, file_path, *args, max_workers=4, enable_cache=True, **kwargs):
+    def __init__(self, file_path, *args, max_workers=4, enable_cache=True,
+                 formats_config=None, **kwargs):
         """
-        Initialize QptiffFile by opening the file and extracting biomarker information.
+        Initialize MxTiffFile by opening the file and extracting channel information.
 
         Parameters:
         -----------
         file_path : str
-            Path to the QPTIFF file
+            Path to the TIFF file
         max_workers : int
             Maximum number of threads for parallel reading (default: 4)
         enable_cache : bool
             Enable LRU caching for page reads (default: True)
+        formats_config : str or None
+            Path to a custom formats.json, or None to use the bundled default
         *args, **kwargs :
             Additional arguments passed to TiffFile constructor
         """
@@ -43,8 +46,8 @@ class MxTiffFile(TiffFile):
         self._file_io_lock = threading.Lock()  # Lock for thread-safe file I/O
         self._thread_local = threading.local()  # Thread-local storage for file handles
 
-        # Extract biomarker information
-        self._extract_biomarkers()
+        # Run format detection pipeline
+        self._detect_and_parse(formats_config)
 
     def _get_thread_local_file_handle(self):
         """
@@ -55,119 +58,66 @@ class MxTiffFile(TiffFile):
             self._thread_local.file_handle = open(self.file_path, 'rb')
         return self._thread_local.file_handle
 
-    def _extract_biomarkers(self) -> None:
+    def _detect_and_parse(self, formats_config=None) -> None:
         """
-        Extract biomarker information from the QPTIFF file.
-        Stores results in self.biomarkers and self.channel_info.
+        Detect the file format and parse channel information using the config-driven pipeline.
+        Sets self.format_id, self.channel_info, self.biomarkers, self.fluorophores.
         """
+        from .format_config import load_formats
+        from .format_detector import detect_format
+        from .parsers import PerPageParser, FileLevelParser, ImageJParser
+        from .heuristic import heuristic_detect
+        from .exceptions import MxTiffFormatError
+
         self.biomarkers = []
         self.fluorophores = []
         self.channel_info = []
+        self.format_id: Optional[str] = None
 
-        # Only process if we have pages to process
         if not hasattr(self, 'series') or len(self.series) == 0 or len(self.series[0].pages) == 0:
             return
 
-        # Process each page in the first series
-        for page_idx, page in enumerate(self.series[0].pages):
-            channel_data = {
-                'index': page_idx,
-                'fluorophore': None,
-                'biomarker': None,
-                'display_name': None,
-                'description': None,
-                'exposure': None,
-                'wavelength': None,
-                'raw_xml': None if not hasattr(page, 'description') else page.description
-            }
+        configs = load_formats(formats_config)
+        fmt = detect_format(self, configs)
 
-            if hasattr(page, 'description') and page.description:
+        if fmt is not None:
+            self.format_id = fmt.id
+            if fmt.metadata_scope == "per_page":
+                channel_data = PerPageParser(fmt, self).parse()
+            elif fmt.metadata_scope == "file_level":
+                channel_data = FileLevelParser(fmt, self).parse()
+            elif fmt.metadata_scope == "imagej":
+                channel_data = ImageJParser(fmt, self).parse()
+            else:
+                channel_data = []
+        else:
+            channel_data = heuristic_detect(self)
+            if channel_data is not None:
+                self.format_id = "heuristic"
+            else:
+                # Build informative error message
                 try:
-                    # Parse XML from the description
-                    root = ET.fromstring(page.description)
+                    import xml.etree.ElementTree as _ET
+                    import re as _re
+                    raw = self.series[0].pages[0].description or ""
+                    cleaned = _re.sub(r"<!--.*?-->", "", raw, flags=_re.DOTALL).strip()
+                    root_tag = _ET.fromstring(cleaned).tag if cleaned else "unknown"
+                    if root_tag.startswith("{"):
+                        root_tag = root_tag.split("}", 1)[1]
+                except Exception:
+                    root_tag = "unknown"
 
-                    # Extract fluorophore name
-                    name_element = root.find('.//Name')
-                    if name_element is not None and name_element.text:
-                        channel_data['fluorophore'] = name_element.text
-                        self.fluorophores.append(name_element.text)
-                    else:
-                        default_name = f"Channel_{page_idx + 1}"
-                        channel_data['fluorophore'] = default_name
-                        self.fluorophores.append(default_name)
+                import qptifffile as _pkg
+                raise MxTiffFormatError(
+                    f"MxTiffFile: cannot detect format for '{self.file_path}'. "
+                    f"Page 0 XML root tag: '{root_tag}'. "
+                    f"Add a config entry in formats.json or set qptifffile.ANCHOR_MARKER "
+                    f"(currently '{_pkg.ANCHOR_MARKER}') to a marker present in this file."
+                )
 
-                    # Look for various metadata elements
-                    self._extract_metadata_element(root, './/DisplayName', 'display_name', channel_data)
-                    self._extract_metadata_element(root, './/Description', 'description', channel_data)
-                    self._extract_metadata_element(root, './/Exposure', 'exposure', channel_data)
-                    self._extract_metadata_element(root, './/Wavelength', 'wavelength', channel_data)
-
-                    # Look for Biomarker element with multiple potential paths
-                    biomarker_paths = [
-                        './/Biomarker',
-                        './/BioMarker',
-                        './/BioMarker/Name',
-                        './/Biomarker/Name',
-                        './/StainName',
-                        './/Marker',
-                        './/ProteinMarker'
-                    ]
-
-                    biomarker_found = False
-                    for path in biomarker_paths:
-                        if self._extract_metadata_element(root, path, 'biomarker', channel_data):
-                            biomarker_found = True
-                            self.biomarkers.append(channel_data['biomarker'])
-                            break
-
-                    if not biomarker_found:
-                        # Use fluorophore name as fallback
-                        channel_data['biomarker'] = channel_data['fluorophore']
-                        self.biomarkers.append(channel_data['biomarker'])
-
-                except ET.ParseError:
-                    # Handle the case where the description is not valid XML
-                    default_name = f"Channel_{page_idx + 1}"
-                    channel_data['fluorophore'] = default_name
-                    channel_data['biomarker'] = default_name
-                    self.fluorophores.append(default_name)
-                    self.biomarkers.append(default_name)
-                except Exception as e:
-                    print(f"Error parsing page {page_idx}: {str(e)}")
-                    default_name = f"Channel_{page_idx + 1}"
-                    channel_data['fluorophore'] = default_name
-                    channel_data['biomarker'] = default_name
-                    self.fluorophores.append(default_name)
-                    self.biomarkers.append(default_name)
-
-            self.channel_info.append(channel_data)
-
-    def _extract_metadata_element(self, root: ET.Element, xpath: str,
-                                  key: str, channel_data: dict) -> bool:
-        """
-        Extract metadata element from XML and add to channel_data.
-
-        Parameters:
-        -----------
-        root : ET.Element
-            XML root element
-        xpath : str
-            XPath to the element
-        key : str
-            Key to store the value in channel_data
-        channel_data : dict
-            Dictionary to store the extracted value
-
-        Returns:
-        --------
-        bool
-            True if element was found and extracted, False otherwise
-        """
-        element = root.find(xpath)
-        if element is not None and element.text:
-            channel_data[key] = element.text
-            return True
-        return False
+        self.channel_info = channel_data or []
+        self.biomarkers = [ch.get("biomarker") for ch in self.channel_info]
+        self.fluorophores = [ch.get("fluorophore") for ch in self.channel_info]
 
     def _read_page_region_optimized(self, page, y: int, x: int, height: int, width: int) -> np.ndarray:
         """
