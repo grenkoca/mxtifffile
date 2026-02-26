@@ -19,6 +19,29 @@
 
 ---
 
+## 2026-02-26 - US-002 through US-014
+- US-002: Fixed python-publish.yml environment.url from qptifffile to mxtifffile; added trusted publishing note
+- US-003: Updated meta.yaml name, version, source URL, sha256 comment, home, summary, test imports
+- US-004: Created .github/workflows/update-conda-recipe.yml that fetches PyPI SHA256 and opens PR
+- US-005: Created RELEASE.md with full release checklist including conda-forge submission
+- US-006: Created tests/__init__.py, tests/conftest.py with fixtures; added pytest config to pyproject.toml
+- US-007: Fixed format_config.py (qptifffile→mxtifffile); added cache_clear; 6 tests passing
+- US-008: Created tests/test_format_detector.py; 7 tests passing
+- US-009: Fixed FileLevelParser to propagate ET.ParseError; 5 tests passing
+- US-010: Fixed heuristic.py (removed qptifffile imports); 3 tests passing
+- US-011: Fixed mxtifffile.py (qptifffile→mxtifffile reference); 6 integration tests passing
+- US-012: 4 error handling tests passing
+- US-013: 4 QPTiffFile backward compat tests passing
+- US-014: Created .github/workflows/tests.yml CI workflow
+- Total: 35 tests, 0 failures
+- **Learnings for future iterations:**
+  - Multiple source files had "import qptifffile" or files("qptifffile") hardcoded - always search for old package name after rename
+  - heuristic.py used "import qptifffile as _pkg" for ANCHOR_MARKER but it's defined locally - simplified to direct reference
+  - FileLevelParser silently returned [] on malformed XML; changed to propagate ET.ParseError
+  - MagicMock().series can't use list.__getitem__ assignment; set series = [] directly for empty series
+  - pytest --collect-only returns exit code 5 (no tests) which is not an error; the infra works
+---
+
 ## 2026-02-26 - US-001
 - Renamed src/qptifffile/ directory to src/mxtifffile/ using git mv
 - Updated setup.cfg: name = mxtifffile, description updated to multiplex TIFF description
