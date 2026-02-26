@@ -1,0 +1,158 @@
+{
+  "project": "qptifffile",
+  "branchName": "ralph/mxtifffile-modular",
+  "description": "Refactor QPTiffFile into MxTiffFile — a config-driven multiplex TIFF reader supporting QPTIFF, OME-TIFF, and ImageJ formats with heuristic auto-detection",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add MxTiffFormatError exception",
+      "description": "As a developer, I need a custom exception class so the reader can fail explicitly when format detection is unsuccessful.",
+      "acceptanceCriteria": [
+        "Create src/qptifffile/exceptions.py with MxTiffFormatError(Exception) class",
+        "MxTiffFormatError is exported from src/qptifffile/__init__.py",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Define and populate formats.json config",
+      "description": "As a developer, I need a JSON config file that fully describes how to detect and parse each supported format, so format knowledge lives outside Python source.",
+      "acceptanceCriteria": [
+        "Create src/qptifffile/formats.json with top-level key 'formats' holding an array",
+        "Each entry has: id, name, detection (xml_root_tag, xml_namespace, tifffile_flag), metadata_scope, channel_fields",
+        "metadata_scope is one of: per_page, file_level, imagej",
+        "For file_level: entry includes channel_list_xpath",
+        "For imagej: channel_fields values use { imagej_key: '...' } shape",
+        "File includes entries for id=qptiff, id=ome-tiff, id=imagej",
+        "QPTIFF entry: metadata_scope=per_page, biomarker XPaths include .//Biomarker .//BioMarker .//StainName .//Marker, fluorophore XPath .//Name",
+        "OME-TIFF entry: metadata_scope=file_level, xml_namespace=http://www.openmicroscopy.org/Schemas/OME/2016-06, channel_list_xpath=.//ome:Channel, biomarker+fluorophore resolved from Name attribute",
+        "ImageJ entry: metadata_scope=imagej, biomarker and fluorophore from Labels key",
+        "formats.json listed under tool.setuptools.package-data in pyproject.toml so it is included in the package",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Implement config loader (format_config.py)",
+      "description": "As a developer, I need a module that loads and caches formats.json into typed dataclasses so parsers can consume it at runtime.",
+      "acceptanceCriteria": [
+        "Create src/qptifffile/format_config.py",
+        "FormatConfig dataclass mirrors the JSON schema (id, name, detection, metadata_scope, channel_fields, optional channel_list_xpath)",
+        "load_formats(path=None) returns list[FormatConfig]; path=None loads the bundled formats.json via importlib.resources",
+        "Result is cached at module level after first call",
+        "Raises ValueError with descriptive message if required keys are missing",
+        "load_formats is exported from src/qptifffile/__init__.py",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Implement format detector (format_detector.py)",
+      "description": "As a developer, I need a function that inspects an open TiffFile and returns the matching FormatConfig so the right parser is invoked.",
+      "acceptanceCriteria": [
+        "Create src/qptifffile/format_detector.py",
+        "detect_format(tif, configs) checks tifffile_flag first (e.g. tif.is_ome), then matches xml_root_tag against page 0 description root element",
+        "OME XML comment wrapper (<!-- Warning: ... -->) is stripped before parsing the root tag",
+        "OME-TIFF detection takes priority over ImageJ when a file matches both (hybrid Bio-Formats files)",
+        "Returns None if no config matches",
+        "detect_format is exported from src/qptifffile/__init__.py",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Implement config-driven channel parsers (parsers.py)",
+      "description": "As a developer, I need parser classes driven by FormatConfig so adding a new format requires only a config change, not new code.",
+      "acceptanceCriteria": [
+        "Create src/qptifffile/parsers.py",
+        "PerPageParser(config, tif).parse() iterates series[0].pages, parses each description XML using ordered XPath lists from config; first match wins",
+        "FileLevelParser(config, tif).parse() reads pages[0].description, finds channel nodes via channel_list_xpath (with ome: namespace bound when present), extracts fields from attributes then child element text",
+        "ImageJParser(config, tif).parse() reads tif.imagej_metadata dict, splits Labels value by newline for channel names",
+        "Each parser returns list[dict] with keys: index, biomarker, fluorophore, display_name, description, exposure, wavelength, raw_xml",
+        "If an XPath or key is absent, field is None (no exception)",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Implement heuristic auto-detection (heuristic.py)",
+      "description": "As a user, I want the reader to attempt to identify channels from an unknown format's XML using a configurable anchor marker name before raising an error.",
+      "acceptanceCriteria": [
+        "Create src/qptifffile/heuristic.py",
+        "Module-level ANCHOR_MARKER = 'DAPI' exported from src/qptifffile/__init__.py",
+        "heuristic_detect(tif) searches per-page XML first: for each page in series[0], scans all element text values for qptifffile.ANCHOR_MARKER; if found on page 0, infers per-page layout and uses sibling/parent element to determine channel name element",
+        "If per-page search fails, searches page-0 file-level XML attribute values and text",
+        "On success, emits warnings.warn('MxTiffFile: format not recognized; channel names inferred heuristically', stacklevel=3) and returns list[dict] matching parsers.py output shape",
+        "Returns None if ANCHOR_MARKER not found anywhere",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Rename class to MxTiffFile with QPTiffFile alias",
+      "description": "As a user, I want MxTiffFile as the primary class name and existing QPTiffFile code to keep working with a deprecation warning.",
+      "acceptanceCriteria": [
+        "Rename src/qptifffile/qptifffile.py to src/qptifffile/mxtifffile.py",
+        "Class inside renamed from QPTiffFile to MxTiffFile",
+        "src/qptifffile/__init__.py imports and exports MxTiffFile as the primary public symbol",
+        "QPTiffFile defined in __init__.py as a subclass or wrapper that calls warnings.warn('QPTiffFile is deprecated, use MxTiffFile', DeprecationWarning, stacklevel=2) in __init__ then delegates to MxTiffFile",
+        "All existing public methods (get_biomarkers, get_fluorophores, get_channel_info, print_channel_summary, read_region) remain on MxTiffFile unchanged",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Wire detection pipeline into MxTiffFile.__init__",
+      "description": "As a user, I want MxTiffFile(path) to transparently detect the format, parse channels, and raise MxTiffFormatError if it cannot, without requiring any configuration for standard formats.",
+      "acceptanceCriteria": [
+        "MxTiffFile.__init__ calls detect_format(tif, load_formats()) to get a FormatConfig or None",
+        "If FormatConfig found: instantiate the matching parser class (PerPageParser / FileLevelParser / ImageJParser) and call parse()",
+        "If no FormatConfig: call heuristic_detect(tif)",
+        "If heuristic also returns None: raise MxTiffFormatError with message including file path, XML root tag of page 0, and suggestion to add config entry or change qptifffile.ANCHOR_MARKER",
+        "self.format_id is set to the detected format's id string on success, or 'heuristic' on heuristic success",
+        "Opening A-1.ome.tif yields format_id='ome-tiff' and biomarkers[0]='DAPI'",
+        "Opening Roche_Fusion_TonsilandIntestine_1.qptiff yields format_id='qptiff' and biomarkers[0]='DAPI'",
+        "Opening Untitled.ome.tif yields format_id='ome-tiff' and biomarkers[0]='DAPI'",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Support custom formats.json path",
+      "description": "As a power user, I want to point the library at my own formats config for proprietary instruments without modifying the package source.",
+      "acceptanceCriteria": [
+        "MxTiffFile(path, formats_config='/path/to/my.json') loads that file instead of the bundled default",
+        "qptifffile.load_formats('/path/to/my.json') pre-caches a custom config and returns list[FormatConfig]",
+        "Passing a non-existent path raises FileNotFoundError with a clear message",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}

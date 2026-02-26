@@ -1,0 +1,59 @@
+{
+  "formats": [
+    {
+      "id": "qptiff",
+      "name": "PerkinElmer/Akoya QPTIFF",
+      "detection": {
+        "xml_root_tag": "PerkinElmer-QPI-ImageDescription",
+        "xml_namespace": null,
+        "tifffile_flag": "is_qpi"
+      },
+      "metadata_scope": "per_page",
+      "channel_fields": {
+        "biomarker": [".//Biomarker", ".//BioMarker", ".//StainName", ".//Marker"],
+        "fluorophore": ".//Name",
+        "display_name": ".//DisplayName",
+        "description": ".//Description",
+        "exposure": ".//ExposureTime",
+        "wavelength": ".//Wavelength"
+      }
+    },
+    {
+      "id": "ome-tiff",
+      "name": "OME-TIFF",
+      "detection": {
+        "xml_root_tag": "OME",
+        "xml_namespace": "http://www.openmicroscopy.org/Schemas/OME/2016-06",
+        "tifffile_flag": "is_ome"
+      },
+      "metadata_scope": "file_level",
+      "channel_list_xpath": ".//ome:Channel",
+      "channel_fields": {
+        "biomarker": "Name",
+        "fluorophore": "Name",
+        "display_name": "Name",
+        "description": null,
+        "exposure": null,
+        "wavelength": null
+      }
+    },
+    {
+      "id": "imagej",
+      "name": "ImageJ TIFF",
+      "detection": {
+        "xml_root_tag": null,
+        "xml_namespace": null,
+        "tifffile_flag": "is_imagej"
+      },
+      "metadata_scope": "imagej",
+      "channel_fields": {
+        "biomarker": {"imagej_key": "Labels"},
+        "fluorophore": {"imagej_key": "Labels"},
+        "display_name": null,
+        "description": null,
+        "exposure": null,
+        "wavelength": null
+      }
+    }
+  ]
+}
