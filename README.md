@@ -1,6 +1,6 @@
-# QPTiffFile
+# qptifffile / MxTiffFile
 
-A Python package for working with .qptiff files which are used in multiplexed fluorescence imaging.
+A Python package for reading and processing multiplex fluorescence TIFF files — including QPTIFF (PerkinElmer/Akoya Fusion), OME-TIFF, and ImageJ TIFF formats.
 
 [![PyPI version](https://badge.fury.io/py/qptifffile.svg)](https://badge.fury.io/py/qptifffile)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/qptifffile?period=total&units=INTERNATIONAL_SYSTEM&left_color=GRAY&right_color=BLUE&left_text=downloads)](https://pepy.tech/projects/qptifffile)
@@ -8,33 +8,141 @@ A Python package for working with .qptiff files which are used in multiplexed fl
 
 ## Overview
 
-QPTiffFile provides tools for reading, processing, and analyzing QPTIFF image files. The package offers:
+`MxTiffFile` is a general-purpose multiplex TIFF reader that automatically detects the file format and extracts channel/biomarker metadata without any manual configuration. Format knowledge is defined in a bundled `formats.json` config file, making it easy to add support for new formats without changing Python code.
 
-- Automatic extraction of biomarker/fluorophore information
+Key capabilities:
+
+- Automatic format detection for QPTIFF, OME-TIFF, and ImageJ TIFF files
+- Config-driven channel extraction — no hardcoded format assumptions
+- Heuristic fallback for unrecognized formats
+- Explicit error (`MxTiffFormatError`) when channel names cannot be determined
 - Memory-efficient tools for extracting regions of interest from large images
-- Support for multi-channel and multi-resolution imagery
+- Support for multi-channel and multi-resolution image pyramids
+- `QPTiffFile` backward-compatible alias (emits `DeprecationWarning`)
 
-### Basic Usage
+## Supported Formats
+
+| Format | Detection | Metadata Scope |
+|--------|-----------|---------------|
+| PerkinElmer/Akoya QPTIFF | `is_qpi` flag or `PerkinElmer-QPI-ImageDescription` XML root | Per-page XML |
+| OME-TIFF | `is_ome` flag or `OME` XML root | File-level XML (page 0) |
+| ImageJ TIFF | `is_imagej` flag | ImageJ metadata dict |
+
+OME-TIFF takes priority over ImageJ for hybrid files produced by Bio-Formats.
+
+## Basic Usage
 
 ```python
-from qptifffile import QPTiffFile
+from qptifffile import MxTiffFile
 
-# Open a QPTIFF file
-qptiff = QPTiffFile('example_image.qptiff')
+# Open any supported multiplex TIFF
+f = MxTiffFile('example_image.qptiff')
+
+# See which format was detected
+print(f.format_id)  # e.g. "qptiff", "ome-tiff", or "imagej"
 
 # Display available biomarkers
-print(qptiff.get_biomarkers())
+print(f.get_biomarkers())
 
 # Print summary of all channels
-qptiff.print_channel_summary()
+f.print_channel_summary()
 
-# Read specific biomarker channels
-dapi_image = qptiff.read_region('DAPI')
-cd8_image = qptiff.read_region('CD8')
+# Read a single channel by biomarker name
+dapi = f.read_region('DAPI')
 
-# Read multiple biomarkers
-markers = qptiff.read_region(['DAPI', 'CD8', 'PD-L1'])
+# Read multiple channels
+markers = f.read_region(['DAPI', 'CD8', 'PD-L1'])
 ```
+
+### Migrating from QPTiffFile
+
+`QPTiffFile` continues to work as a drop-in alias but will emit a `DeprecationWarning`. Update your imports to use `MxTiffFile`:
+
+```python
+# Before (deprecated)
+from qptifffile import QPTiffFile
+f = QPTiffFile('image.qptiff')
+
+# After
+from qptifffile import MxTiffFile
+f = MxTiffFile('image.qptiff')
+```
+
+## Advanced Usage
+
+### Heuristic Detection
+
+For files not matched by any entry in `formats.json`, the reader falls back to a heuristic that searches the file's XML metadata for a configurable anchor marker name. By default this is `"DAPI"`:
+
+```python
+import qptifffile
+
+# Change the anchor marker used for heuristic detection
+qptifffile.ANCHOR_MARKER = "HOECHST"
+
+f = qptifffile.MxTiffFile('unknown_format.tiff')
+```
+
+If the heuristic succeeds, a warning is emitted: `MxTiffFile: format not recognized; channel names inferred heuristically`. If both config-based and heuristic detection fail, `MxTiffFormatError` is raised.
+
+### Handling Unknown Formats
+
+```python
+from qptifffile import MxTiffFile, MxTiffFormatError
+
+try:
+    f = MxTiffFile('proprietary_image.tiff')
+except MxTiffFormatError as e:
+    print(f"Could not detect format: {e}")
+    # The error message includes the file path, XML root tag (if any),
+    # and a suggestion to add a config entry or change ANCHOR_MARKER
+```
+
+### Custom Format Configuration
+
+Point the reader at your own `formats.json` to support proprietary or non-standard formats:
+
+```python
+from qptifffile import MxTiffFile
+
+# Per-file custom config
+f = MxTiffFile('proprietary.tiff', formats_config='/path/to/my_formats.json')
+```
+
+You can also pre-cache a custom config for use across multiple files:
+
+```python
+from qptifffile import load_formats
+
+load_formats('/path/to/my_formats.json')
+```
+
+### formats.json Schema
+
+Each entry in `formats.json` describes how to detect a format and where to find channel metadata:
+
+```json
+{
+  "formats": [
+    {
+      "id": "my-format",
+      "name": "My Instrument Format",
+      "detection": {
+        "xml_root_tag": "MyRootElement",
+        "xml_namespace": null,
+        "tifffile_flag": null
+      },
+      "metadata_scope": "per_page",
+      "channel_fields": {
+        "biomarker": [".//MarkerName", ".//Biomarker"],
+        "fluorophore": ".//Fluorophore"
+      }
+    }
+  ]
+}
+```
+
+`metadata_scope` is one of `"per_page"`, `"file_level"`, or `"imagej"`. XPath lists are tried in order; the first match wins.
 
 ## Installation
 
@@ -44,7 +152,6 @@ markers = qptiff.read_region(['DAPI', 'CD8', 'PD-L1'])
 pip install qptifffile
 ```
 
-
 ### From Source
 
 ```bash
@@ -52,6 +159,7 @@ git clone https://github.com/grenkoca/qptifffile.git
 cd qptifffile
 pip install -e .
 ```
+
 ## System Requirements
 
 For full functionality including compressed TIFF support, you'll need:
@@ -59,15 +167,11 @@ For full functionality including compressed TIFF support, you'll need:
 ### macOS
 
 ```bash
-# For Apple Silicon
-brew install libaec
-
-# For Intel Macs
+# For Apple Silicon or Intel
 brew install libaec
 ```
 
 _note: on Apple Silicon chips, you may need to install libaec via conda: https://anaconda.org/conda-forge/libaec/_
-
 
 ### Linux
 
@@ -93,75 +197,58 @@ Optional dependencies:
 ## Usage Examples
 
 See [this link](https://downloads.openmicroscopy.org/images/Vectra-QPTIFF/perkinelmer/PKI_scans/) for publicly available PhenoCycler data:
-```{bash}
+```bash
 # Or, pull an image directly:
 wget https://downloads.openmicroscopy.org/images/Vectra-QPTIFF/perkinelmer/PKI_scans/LuCa-7color_Scan1.qptiff
 ```
 
 ### Working with Regions of Interest
 
-```{python}
-In [1]: from qptifffile import QPTiffFile
+```python
+In [1]: from qptifffile import MxTiffFile
 
-In [2]: f = QPTiffFile('../Phenocycler/Data/slides/Scan1.qptiff')
+In [2]: f = MxTiffFile('../Phenocycler/Data/slides/Scan1.qptiff')
 
-In [3]: f.read_region('DAPI')
-Out[3]: 
+In [3]: f.format_id
+Out[3]: 'qptiff'
+
+In [4]: f.read_region('DAPI')
+Out[4]:
 memmap([[0, 0, 0, ..., 0, 0, 0],
         [0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0],
-        ...,
-        [0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0],
+        ...
         [0, 0, 0, ..., 0, 0, 0]], dtype=uint8)
 ```
+
 You can also do more complex calls by specifying:
 
-    a set of multiple channels by name (layers)
-    various x/y locations (pos) or subregions (shape)
-    different downsampled levels in the image pyramid (level)
+- a set of multiple channels by name (`layers`)
+- various x/y locations (`pos`) or subregions (`shape`)
+- different downsampled levels in the image pyramid (`level`)
 
-```{python}
-# Note, if your stains are named, you can refer to tehm as 
-In [4]: f.read_region(
-    ...:     layers=['DAPI', 'FITC', 'Texas Red'],
-    ...:     pos=(500, 1000),
-    ...:     shape=(500, 500),
-    ...:     level=2
-    ...: )
-# Will be a (x, y, # stains) array
-Out[4]: 
+```python
+In [5]: f.read_region(
+   ...:     layers=['DAPI', 'FITC', 'Texas Red'],
+   ...:     pos=(500, 1000),
+   ...:     shape=(500, 500),
+   ...:     level=2
+   ...: )
+# Returns an (x, y, num_channels) array
+Out[5]:
 array([[[0, 0, 0],
         [0, 0, 0],
-        [0, 0, 0],
-        ...,
-        [5, 0, 0],
-        [2, 0, 0],
-        [1, 0, 0]],
-
-       [[0, 0, 0],
-        [0, 0, 0],
-        [0, 0, 0],
-        ...,
-        [1, 0, 0],
-        [1, 0, 0],
-        [1, 0, 0]]], dtype=uint8)
-[output truncated by user]
+        ...]], dtype=uint8)
 ```
-and the memmap objects can be easily plugged into other methods that accept array-like objects, such as displaying in matplotlib:
 
-```{python}
-In [5]: import matplotlib.pyplot as plt
-In [5]: img = f.read_region(
-    ...:     layers=['DAPI'],
-    ...:     shape=(500, 500),
-    ...:     level=4)
+The returned arrays are compatible with any library that accepts array-like objects, such as matplotlib:
 
-In [6]: plt.imshow(img, cmap='gray')
-Out[6]: <matplotlib.image.AxesImage at 0x12bcc8cb0>
-
-In [7]: plt.show()
+```python
+In [6]: import matplotlib.pyplot as plt
+In [7]: img = f.read_region(layers=['DAPI'], shape=(500, 500), level=4)
+In [8]: plt.imshow(img, cmap='gray')
+In [9]: plt.show()
 ```
+
 <img src=https://github.com/grenkoca/qptifffile/blob/main/.imgs/image.jpg width="50%">
 
 ## Citation
